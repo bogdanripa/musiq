@@ -111,7 +111,7 @@ export function Playlist({
         map.set(trackId, arr);
       }
     }
-    for (const [k, arr] of map) arr.sort((a, b) => a.localeCompare(b));
+    for (const arr of map.values()) arr.sort((a, b) => a.localeCompare(b));
     return map;
   }, [songs, allVotes, users]);
 
