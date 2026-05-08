@@ -1,0 +1,44 @@
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            functions/package-lock.json
+
+      - name: Install web deps
+        run: npm ci
+        working-directory: web
+
+      - name: Build web
+        run: npm run build
+        working-directory: web
+
+      - name: Install functions deps
+        run: npm ci
+        working-directory: functions
+
+      - name: Build functions
+        run: npm run build
+        working-directory: functions
+
+      - name: Deploy to Firebase
+        uses: w9jds/firebase-action@v14.10.1
+        with:
+          args: deploy --only hosting,functions,firestore --non-interactive
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: musiq-d6dd3

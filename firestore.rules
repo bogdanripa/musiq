@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // User profile docs are written by the addSong callable. Read-only for clients.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    // Per-user vote map. Owner reads/writes their own.
+    match /userVotes/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Songs are created by the addSong callable (admin SDK bypasses rules).
+    // Clients can read all, and update ONLY the `score` field — paired with a
+    // write to their own /userVotes/{uid} doc in the same transaction.
+    match /songs/{trackId} {
+      allow read: if signedIn();
+      allow create, delete: if false;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['score']);
+    }
+  }
+}
