@@ -52,6 +52,27 @@ export function Playlist({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, "up" | "down" | null>>({});
 
+  // For each trackId: list of voter names (excluding the song's adder).
+  // Direction (up/down) is intentionally hidden.
+  const votersByTrack = useMemo(() => {
+    const adderByTrack = new Map<string, string>();
+    for (const s of songs) adderByTrack.set(s.trackId, s.addedBy.uid);
+    const map = new Map<string, string[]>();
+    for (const [uid, votes] of Object.entries(allVotes)) {
+      for (const trackId of Object.keys(votes)) {
+        const adder = adderByTrack.get(trackId);
+        if (!adder || adder === uid) continue;
+        const name = users[uid]?.displayName ?? null;
+        if (!name) continue;
+        const arr = map.get(trackId) ?? [];
+        arr.push(name);
+        map.set(trackId, arr);
+      }
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.localeCompare(b));
+    return map;
+  }, [songs, allVotes, users]);
+
   if (songs.length === 0) {
     const isFiltered = !!(filters.adder || filters.genre || filters.artist);
     return (
@@ -93,27 +114,6 @@ export function Playlist({
   const togglePlay = (trackId: string) => {
     setPlayingId((current) => (current === trackId ? null : trackId));
   };
-
-  // For each trackId: list of voter names (excluding the song's adder).
-  // Direction (up/down) is intentionally hidden.
-  const votersByTrack = useMemo(() => {
-    const adderByTrack = new Map<string, string>();
-    for (const s of songs) adderByTrack.set(s.trackId, s.addedBy.uid);
-    const map = new Map<string, string[]>();
-    for (const [uid, votes] of Object.entries(allVotes)) {
-      for (const trackId of Object.keys(votes)) {
-        const adder = adderByTrack.get(trackId);
-        if (!adder || adder === uid) continue;
-        const name = users[uid]?.displayName ?? null;
-        if (!name) continue;
-        const arr = map.get(trackId) ?? [];
-        arr.push(name);
-        map.set(trackId, arr);
-      }
-    }
-    for (const arr of map.values()) arr.sort((a, b) => a.localeCompare(b));
-    return map;
-  }, [songs, allVotes, users]);
 
   return (
     <ol className="playlist">
