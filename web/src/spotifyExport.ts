@@ -101,33 +101,72 @@ async function spotifyFetch(token: string, path: string, init?: RequestInit) {
   return res.json();
 }
 
+export interface ExportResult {
+  playlistId: string;
+  playlistUrl: string;
+}
+
 export async function exportToSpotify(
   cb: PendingCallback,
   songs: Song[],
-  playlistName: string
-): Promise<string> {
+  playlistName: string,
+  existingPlaylistId: string | null
+): Promise<ExportResult> {
   const token = await exchangeToken(cb);
-
-  const me = await spotifyFetch(token, "/me");
-  const playlist = await spotifyFetch(token, `/users/${me.id}/playlists`, {
-    method: "POST",
-    body: JSON.stringify({
-      name: playlistName,
-      description: "Created by the Birthday Party Playlist app 🎉",
-      public: false,
-    }),
-  });
 
   const ordered = [...songs].sort((a, b) => b.score - a.score);
   const uris = ordered.map((s) => `spotify:track:${s.trackId}`);
 
+  let playlistId = existingPlaylistId;
+  let playlistUrl: string;
+
+  if (playlistId) {
+    // Verify the playlist still exists and is owned by the current user.
+    try {
+      const existing = await spotifyFetch(token, `/playlists/${playlistId}`);
+      playlistUrl = existing.external_urls.spotify as string;
+    } catch {
+      // Got deleted or not accessible — fall back to creating a new one.
+      playlistId = null;
+    }
+  }
+
+  if (!playlistId) {
+    const me = await spotifyFetch(token, "/me");
+    const created = await spotifyFetch(token, `/users/${me.id}/playlists`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: playlistName,
+        description: "Created by the Birthday Party Playlist app 🎉",
+        public: false,
+      }),
+    });
+    playlistId = created.id as string;
+    playlistUrl = created.external_urls.spotify as string;
+  } else {
+    // Replace all tracks: PUT with first chunk replaces, subsequent chunks
+    // append. PUT with empty array clears.
+    await spotifyFetch(token, `/playlists/${playlistId}/tracks`, {
+      method: "PUT",
+      body: JSON.stringify({ uris: uris.slice(0, 100) }),
+    });
+    for (let i = 100; i < uris.length; i += 100) {
+      const chunk = uris.slice(i, i + 100);
+      await spotifyFetch(token, `/playlists/${playlistId}/tracks`, {
+        method: "POST",
+        body: JSON.stringify({ uris: chunk }),
+      });
+    }
+    return { playlistId, playlistUrl: playlistUrl! };
+  }
+
   for (let i = 0; i < uris.length; i += 100) {
     const chunk = uris.slice(i, i + 100);
-    await spotifyFetch(token, `/playlists/${playlist.id}/tracks`, {
+    await spotifyFetch(token, `/playlists/${playlistId}/tracks`, {
       method: "POST",
       body: JSON.stringify({ uris: chunk }),
     });
   }
 
-  return playlist.external_urls.spotify as string;
+  return { playlistId, playlistUrl };
 }

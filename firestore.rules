@@ -22,6 +22,12 @@ service cloud.firestore {
     // Songs are created by the addSong callable (admin SDK bypasses rules).
     // Clients can read all, and update ONLY the `score` field — paired with a
     // write to their own /userVotes/{uid} doc in the same transaction.
+    // Export metadata (Spotify playlist link). Host-only writes.
+    match /meta/{docId} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.token.email == 'bogdanripa@gmail.com';
+    }
+
     match /songs/{trackId} {
       allow read: if signedIn();
       allow create, delete: if false;

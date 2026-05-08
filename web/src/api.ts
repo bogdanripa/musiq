@@ -1,9 +1,12 @@
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   query,
   runTransaction,
+  serverTimestamp,
+  setDoc,
   orderBy,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -81,6 +84,31 @@ export function subscribeAllVoteCounts(cb: (counts: VoteCounts) => void): () => 
       counts[d.id] = Object.keys(votes).length;
     }
     cb(counts);
+  });
+}
+
+export interface ExportInfo {
+  playlistId: string;
+  playlistUrl: string;
+  lastExportedAt?: unknown;
+}
+
+export function subscribeExportInfo(cb: (info: ExportInfo | null) => void) {
+  return onSnapshot(doc(db, "meta", "export"), (snap) => {
+    cb(snap.exists() ? (snap.data() as ExportInfo) : null);
+  });
+}
+
+export async function getExportInfo(): Promise<ExportInfo | null> {
+  const snap = await getDoc(doc(db, "meta", "export"));
+  return snap.exists() ? (snap.data() as ExportInfo) : null;
+}
+
+export async function saveExportInfo(playlistId: string, playlistUrl: string) {
+  await setDoc(doc(db, "meta", "export"), {
+    playlistId,
+    playlistUrl,
+    lastExportedAt: serverTimestamp(),
   });
 }
 

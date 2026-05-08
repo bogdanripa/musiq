@@ -4,7 +4,7 @@ import {
   exportToSpotify,
   startSpotifyAuth,
 } from "../spotifyExport";
-import { backfillBpm } from "../api";
+import { backfillBpm, getExportInfo, saveExportInfo, subscribeExportInfo, type ExportInfo } from "../api";
 import type { Song } from "../types";
 
 interface Props {
@@ -14,9 +14,11 @@ interface Props {
 
 export function ExportToSpotify({ songs, showToast }: Props) {
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [exportInfo, setExportInfo] = useState<ExportInfo | null>(null);
+
+  useEffect(() => subscribeExportInfo(setExportInfo), []);
 
   useEffect(() => {
     const cb = consumePendingCallback();
@@ -25,12 +27,27 @@ export function ExportToSpotify({ songs, showToast }: Props) {
     setBusy(true);
     (async () => {
       try {
+        const existing = await getExportInfo();
         const name = `Body's Birthday — ${new Date().toLocaleDateString()}`;
-        const url = await exportToSpotify(cb, songs, name);
-        if (!cancelled) setResult(url);
+        const result = await exportToSpotify(
+          cb,
+          songs,
+          name,
+          existing?.playlistId ?? null
+        );
+        await saveExportInfo(result.playlistId, result.playlistUrl);
+        if (!cancelled) {
+          showToast(
+            existing ? "Spotify playlist refreshed ✅" : "Spotify playlist created ✅",
+            "success"
+          );
+        }
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Export failed";
-        if (!cancelled) setError(msg);
+        if (!cancelled) {
+          setError(msg);
+          showToast(msg, "error");
+        }
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -66,10 +83,15 @@ export function ExportToSpotify({ songs, showToast }: Props) {
     }
   };
 
+  const hasExport = !!exportInfo;
+  const buttonLabel = busy
+    ? hasExport ? "Refreshing…" : "Exporting…"
+    : hasExport ? "🔄 Refresh Spotify list" : "📥 Export to Spotify";
+
   return (
     <div className="export">
       <button className="primary export-btn" onClick={onExport} disabled={busy}>
-        {busy ? "Exporting…" : "📥 Export to Spotify"}
+        {buttonLabel}
       </button>
       <button
         className="ghost"
@@ -79,9 +101,14 @@ export function ExportToSpotify({ songs, showToast }: Props) {
       >
         {backfilling ? "Refreshing…" : "🔄 Refresh genres"}
       </button>
-      {result && (
-        <a className="export-success" href={result} target="_blank" rel="noreferrer">
-          ✅ Playlist created — open in Spotify ↗
+      {exportInfo && (
+        <a
+          className="export-success"
+          href={exportInfo.playlistUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          🎧 Open playlist in Spotify ↗
         </a>
       )}
       {error && <div className="error">{error}</div>}
