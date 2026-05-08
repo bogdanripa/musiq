@@ -38,10 +38,16 @@ export function Stats({ songs, allSongs, allVotes, filters, onFilter }: Props) {
     return top;
   }, [songs]);
 
-  const topPicks = useMemo(
-    () => [...songs].filter((s) => s.score > 0).slice(0, 3),
-    [songs]
-  );
+  const latestPicks = useMemo(() => {
+    const ts = (s: Song): number => {
+      const a = s.addedAt as unknown as { toMillis?: () => number; seconds?: number } | null;
+      if (!a) return 0;
+      if (typeof a.toMillis === "function") return a.toMillis();
+      if (typeof a.seconds === "number") return a.seconds * 1000;
+      return 0;
+    };
+    return [...songs].sort((a, b) => ts(b) - ts(a)).slice(0, 3);
+  }, [songs]);
 
   const contributors = useMemo(() => {
     type Entry = {
@@ -140,20 +146,21 @@ export function Stats({ songs, allSongs, allVotes, filters, onFilter }: Props) {
       </div>
 
       <div className="stat-card">
-        <h3>Top picks</h3>
-        {topPicks.length === 0 ? (
-          <div className="muted">No upvoted songs yet</div>
+        <h3>Latest picks</h3>
+        {latestPicks.length === 0 ? (
+          <div className="muted">No songs yet</div>
         ) : (
           <ul className="picks">
-            {topPicks.map((s, i) => (
+            {latestPicks.map((s) => (
               <li key={s.trackId}>
-                <span className="rank-badge">{i + 1}</span>
                 {s.coverUrl && <img src={s.coverUrl} alt="" />}
                 <div className="pmeta">
                   <div className="pname">{s.name}</div>
                   <div className="partist">{s.artistNames}</div>
                 </div>
-                <span className={`pscore ${s.score > 0 ? "pos" : ""}`}>+{s.score}</span>
+                <span className={`pscore ${s.score > 0 ? "pos" : s.score < 0 ? "neg" : ""}`}>
+                  {s.score > 0 ? `+${s.score}` : s.score}
+                </span>
               </li>
             ))}
           </ul>
