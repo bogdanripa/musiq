@@ -3,19 +3,20 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { Song } from "../types";
-import type { VoteCounts } from "../api";
+import type { AllVotes } from "../api";
 import type { Filters } from "../filters";
 
 interface Props {
-  songs: Song[];
-  voteCounts: VoteCounts;
+  songs: Song[];        // filtered subset (drives charts/picks/numbers)
+  allSongs: Song[];     // unfiltered (used to compute per-user contributions)
+  allVotes: AllVotes;   // every user's vote map
   filters?: Filters;
   onFilter?: (next: Filters) => void;
 }
 
 const COLORS = ["#ff7a6b", "#ffb86b", "#ffd76b", "#a3e36b", "#6be3c8", "#6bbfff", "#a06bff", "#ff6bd9"];
 
-export function Stats({ songs, voteCounts, filters, onFilter }: Props) {
+export function Stats({ songs, allSongs, allVotes, filters, onFilter }: Props) {
   const genreData = useMemo(() => {
     const map = new Map<string, number>();
     let untagged = 0;
@@ -48,10 +49,14 @@ export function Stats({ songs, voteCounts, filters, onFilter }: Props) {
       name: string;
       photoURL: string | null;
       songs: number;
-      votes: number;
+      votes: number; // votes cast on OTHERS' songs
     };
+    // Map trackId -> adder uid so we can tell self-votes apart.
+    const trackAdder = new Map<string, string>();
+    for (const s of allSongs) trackAdder.set(s.trackId, s.addedBy.uid);
+
     const map = new Map<string, Entry>();
-    for (const s of songs) {
+    for (const s of allSongs) {
       const e = map.get(s.addedBy.uid) ?? {
         uid: s.addedBy.uid,
         name: s.addedBy.name,
@@ -62,21 +67,39 @@ export function Stats({ songs, voteCounts, filters, onFilter }: Props) {
       e.songs += 1;
       map.set(s.addedBy.uid, e);
     }
-    for (const [uid, count] of Object.entries(voteCounts)) {
+    for (const [uid, votes] of Object.entries(allVotes)) {
       const e = map.get(uid);
-      if (e) e.votes = count;
-      // Voters who never added a song are skipped — we have no name for them.
+      if (!e) continue;
+      let onOthers = 0;
+      for (const trackId of Object.keys(votes)) {
+        const adder = trackAdder.get(trackId);
+        if (adder && adder !== uid) onOthers += 1;
+      }
+      e.votes = onOthers;
     }
     return Array.from(map.values())
       .map((e) => ({ ...e, total: e.songs + e.votes }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
-  }, [songs, voteCounts]);
+  }, [allSongs, allVotes]);
 
   const totalSongs = songs.length;
-  const totalVotes = songs.reduce((sum, s) => sum + Math.abs(s.score), 0);
   const totalDuration = songs.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
   const totalMin = Math.round(totalDuration / 60000);
+  // Engagement votes = votes cast on songs added by someone else
+  // (excludes the auto-upvote each adder gives their own pick).
+  const totalVotes = useMemo(() => {
+    const trackAdder = new Map<string, string>();
+    for (const s of allSongs) trackAdder.set(s.trackId, s.addedBy.uid);
+    let n = 0;
+    for (const [uid, votes] of Object.entries(allVotes)) {
+      for (const trackId of Object.keys(votes)) {
+        const adder = trackAdder.get(trackId);
+        if (adder && adder !== uid) n += 1;
+      }
+    }
+    return n;
+  }, [allSongs, allVotes]);
 
   return (
     <section className="stats">

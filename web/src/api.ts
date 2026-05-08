@@ -75,6 +75,8 @@ export function subscribeMyVotes(uid: string, cb: (v: VoteMap) => void): () => v
 }
 
 export type VoteCounts = Record<string, number>;
+// uid -> { trackId -> 1|-1 }
+export type AllVotes = Record<string, Record<string, 1 | -1>>;
 
 export function subscribeAllVoteCounts(cb: (counts: VoteCounts) => void): () => void {
   return onSnapshot(collection(db, "userVotes"), (snap) => {
@@ -84,6 +86,16 @@ export function subscribeAllVoteCounts(cb: (counts: VoteCounts) => void): () => 
       counts[d.id] = Object.keys(votes).length;
     }
     cb(counts);
+  });
+}
+
+export function subscribeAllVotes(cb: (all: AllVotes) => void): () => void {
+  return onSnapshot(collection(db, "userVotes"), (snap) => {
+    const all: AllVotes = {};
+    for (const d of snap.docs) {
+      all[d.id] = (d.data().votes ?? {}) as Record<string, 1 | -1>;
+    }
+    cb(all);
   });
 }
 

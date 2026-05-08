@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import {
-  subscribeAllVoteCounts,
+  subscribeAllVotes,
   subscribeMyVotes,
   subscribeSongs,
-  type VoteCounts,
+  type AllVotes,
   type VoteMap,
 } from "./api";
 import type { Song } from "./types";
@@ -14,6 +14,7 @@ import { Playlist } from "./components/Playlist";
 import { AddSong } from "./components/AddSong";
 import { Stats } from "./components/Stats";
 import { ExportToSpotify } from "./components/ExportToSpotify";
+import { Debug } from "./components/Debug";
 import { Toast } from "./components/Toast";
 import { FilterBar } from "./components/FilterBar";
 import { filterSongs, type Filters } from "./filters";
@@ -28,7 +29,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [myVotes, setMyVotes] = useState<VoteMap>({});
-  const [voteCounts, setVoteCounts] = useState<VoteCounts>({});
+  const [allVotes, setAllVotes] = useState<AllVotes>({});
   const [toast, setToast] = useState<ToastState>(null);
   const [filters, setFilters] = useState<Filters>({});
 
@@ -45,8 +46,8 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user) { setVoteCounts({}); return; }
-    return subscribeAllVoteCounts(setVoteCounts);
+    if (!user) { setAllVotes({}); return; }
+    return subscribeAllVotes(setAllVotes);
   }, [user]);
 
   const myCount = useMemo(
@@ -80,12 +81,18 @@ export default function App() {
 
       <Stats
         songs={filteredSongs}
-        voteCounts={voteCounts}
+        allSongs={songs}
+        allVotes={allVotes}
         filters={filters}
         onFilter={setFilters}
       />
 
-      {user.email === HOST_EMAIL && <ExportToSpotify songs={songs} showToast={showToast} />}
+      {user.email === HOST_EMAIL && (
+        <>
+          <ExportToSpotify songs={songs} showToast={showToast} />
+          <Debug />
+        </>
+      )}
 
       <AddSong songs={songs} myCount={myCount} myVotes={myVotes} showToast={showToast} />
 

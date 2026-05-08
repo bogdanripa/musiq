@@ -269,6 +269,22 @@ button.ghost {
 
 .ghost.inline { padding: 2px 8px; font-size: 0.85rem; margin-left: 6px; }
 
+.debug { margin-bottom: 12px; }
+.debug-body {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  max-height: 60vh;
+  overflow: auto;
+}
+.debug-body h4 { margin: 12px 0 6px; color: var(--accent-2); }
+.debug-body ul { padding-left: 18px; margin: 4px 0; }
+.debug-body details { margin-top: 4px; }
+.debug-body summary { cursor: pointer; color: var(--muted); }
+
 .explicit {
   display: inline-block;
   font-size: 0.6rem;
