@@ -4,7 +4,14 @@ import {
   exportToSpotify,
   startSpotifyAuth,
 } from "../spotifyExport";
-import { backfillBpm, getExportInfo, saveExportInfo, subscribeExportInfo, type ExportInfo } from "../api";
+import {
+  backfillBpm,
+  fetchAllSongs,
+  getExportInfo,
+  saveExportInfo,
+  subscribeExportInfo,
+  type ExportInfo,
+} from "../api";
 import type { Song } from "../types";
 
 interface Props {
@@ -27,18 +34,30 @@ export function ExportToSpotify({ songs, showToast }: Props) {
     setBusy(true);
     (async () => {
       try {
-        const existing = await getExportInfo();
+        // Fetch songs FRESH from Firestore. The `songs` prop is empty on the
+        // page that handles the OAuth redirect (subscriptions haven't loaded
+        // yet) and using it would PUT an empty playlist, wiping the existing
+        // tracks. This guarantees we always have the real list before writing.
+        const [existing, freshSongs] = await Promise.all([
+          getExportInfo(),
+          fetchAllSongs(),
+        ]);
+        if (freshSongs.length === 0) {
+          throw new Error("No songs loaded — refused to clear playlist");
+        }
         const name = "Body's 47th";
         const result = await exportToSpotify(
           cb,
-          songs,
+          freshSongs,
           name,
           existing?.playlistId ?? null
         );
         await saveExportInfo(result.playlistId, result.playlistUrl);
         if (!cancelled) {
           showToast(
-            existing ? "Spotify playlist refreshed ✅" : "Spotify playlist created ✅",
+            existing
+              ? `Spotify playlist refreshed (${freshSongs.length} songs) ✅`
+              : `Spotify playlist created (${freshSongs.length} songs) ✅`,
             "success"
           );
         }

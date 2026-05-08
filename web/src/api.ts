@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   runTransaction,
@@ -129,6 +130,11 @@ export function subscribeExportInfo(cb: (info: ExportInfo | null) => void) {
   return onSnapshot(doc(db, "meta", "export"), (snap) => {
     cb(snap.exists() ? (snap.data() as ExportInfo) : null);
   });
+}
+
+export async function fetchAllSongs(): Promise<Song[]> {
+  const snap = await getDocs(collection(db, "songs"));
+  return snap.docs.map((d) => d.data() as Song);
 }
 
 export async function getExportInfo(): Promise<ExportInfo | null> {
