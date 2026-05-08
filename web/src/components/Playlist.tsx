@@ -84,7 +84,6 @@ export function Playlist({ songs, myVotes, showToast }: Props) {
                 <div className="artist">{s.artistNames}</div>
                 <div className="sub">
                   <span>{s.album}</span>
-                  {s.bpm && <span> · {s.bpm} BPM</span>}
                   {s.genres?.[0] && <span> · {s.genres[0]}</span>}
                 </div>
                 <div className="added-by">

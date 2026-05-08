@@ -24,7 +24,7 @@ const _removeSong = httpsCallable<{ trackId: string }, { ok: true }>(
 );
 const _backfillBpm = httpsCallable<
   unknown,
-  { updated: number; skipped: number; total: number }
+  { total: number; bpmUpdated: number; genresUpdated: number }
 >(functions, "backfillBpm");
 
 export async function backfillBpm() {

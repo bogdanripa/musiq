@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { Song } from "../types";
 import type { VoteCounts } from "../api";
@@ -15,30 +15,29 @@ const COLORS = ["#ff7a6b", "#ffb86b", "#ffd76b", "#a3e36b", "#6be3c8", "#6bbfff"
 export function Stats({ songs, voteCounts }: Props) {
   const genreData = useMemo(() => {
     const map = new Map<string, number>();
+    let untagged = 0;
     for (const s of songs) {
-      const g = s.genres?.[0];
-      if (!g) continue;
-      map.set(g, (map.get(g) ?? 0) + 1);
+      if (!s.genres || s.genres.length === 0) {
+        untagged += 1;
+        continue;
+      }
+      // Count every genre the song has (some songs span 2-3 genres).
+      for (const g of s.genres) {
+        map.set(g, (map.get(g) ?? 0) + 1);
+      }
     }
-    return Array.from(map.entries())
+    const top = Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 6);
+    if (untagged > 0) top.push({ name: "untagged", value: untagged });
+    return top;
   }, [songs]);
 
-  const bpmData = useMemo(() => {
-    const buckets = [
-      { range: "<80",   min: 0,   max: 80 },
-      { range: "80-100", min: 80, max: 100 },
-      { range: "100-120", min: 100, max: 120 },
-      { range: "120-140", min: 120, max: 140 },
-      { range: "140+",  min: 140, max: 999 },
-    ];
-    return buckets.map((b) => ({
-      range: b.range,
-      count: songs.filter((s) => s.bpm != null && s.bpm >= b.min && s.bpm < b.max).length,
-    }));
-  }, [songs]);
+  const topPicks = useMemo(
+    () => [...songs].filter((s) => s.score > 0).slice(0, 3),
+    [songs]
+  );
 
   const contributors = useMemo(() => {
     type Entry = {
@@ -108,15 +107,24 @@ export function Stats({ songs, voteCounts }: Props) {
       </div>
 
       <div className="stat-card">
-        <h3>BPM</h3>
-        <ResponsiveContainer width="100%" height={140}>
-          <BarChart data={bpmData}>
-            <XAxis dataKey="range" tick={{ fontSize: 11 }} />
-            <YAxis hide />
-            <Tooltip />
-            <Bar dataKey="count" fill="#6bbfff" />
-          </BarChart>
-        </ResponsiveContainer>
+        <h3>Top picks</h3>
+        {topPicks.length === 0 ? (
+          <div className="muted">No upvoted songs yet</div>
+        ) : (
+          <ul className="picks">
+            {topPicks.map((s, i) => (
+              <li key={s.trackId}>
+                <span className="rank-badge">{i + 1}</span>
+                {s.coverUrl && <img src={s.coverUrl} alt="" />}
+                <div className="pmeta">
+                  <div className="pname">{s.name}</div>
+                  <div className="partist">{s.artistNames}</div>
+                </div>
+                <span className={`pscore ${s.score > 0 ? "pos" : ""}`}>+{s.score}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="stat-card">

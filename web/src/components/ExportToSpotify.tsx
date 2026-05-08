@@ -54,7 +54,10 @@ export function ExportToSpotify({ songs, showToast }: Props) {
     setBackfilling(true);
     try {
       const res = await backfillBpm();
-      showToast(`BPM backfill done: ${res.updated} updated, ${res.skipped} already had BPM.`, "success");
+      showToast(
+        `Refreshed ${res.genresUpdated} song genres (of ${res.total}).`,
+        "success"
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Backfill failed";
       showToast(msg, "error");
@@ -68,8 +71,13 @@ export function ExportToSpotify({ songs, showToast }: Props) {
       <button className="primary export-btn" onClick={onExport} disabled={busy}>
         {busy ? "Exporting…" : "📥 Export to Spotify"}
       </button>
-      <button className="ghost" onClick={onBackfill} disabled={backfilling}>
-        {backfilling ? "Looking up BPM…" : "🎚️ Backfill BPM"}
+      <button
+        className="ghost"
+        onClick={onBackfill}
+        disabled={backfilling}
+        title="Re-fetch missing genres for existing songs"
+      >
+        {backfilling ? "Refreshing…" : "🔄 Refresh genres"}
       </button>
       {result && (
         <a className="export-success" href={result} target="_blank" rel="noreferrer">

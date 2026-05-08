@@ -81,12 +81,7 @@ export default function App() {
 
       <Playlist songs={songs} myVotes={myVotes} showToast={showToast} />
 
-      <footer className="footer">
-        BPM data provided by{" "}
-        <a href="https://getsongbpm.com" target="_blank" rel="noreferrer">
-          Get Song BPM
-        </a>
-      </footer>
+      <footer className="footer">Made for the party 🎈</footer>
 
       <Toast
         message={toast?.message ?? null}

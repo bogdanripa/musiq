@@ -108,19 +108,57 @@ async function fetchArtistGenres(token: string, artistIds: string[]): Promise<st
   return Array.from(new Set(all));
 }
 
+async function fetchSpotifyTempo(token: string, trackId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      logger.info(`Spotify audio-features ${trackId} -> ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as { tempo?: number };
+    if (typeof data.tempo === "number" && data.tempo > 0) {
+      return Math.round(data.tempo);
+    }
+    return null;
+  } catch (e) {
+    logger.warn("Spotify audio-features failed", e);
+    return null;
+  }
+}
+
+function cleanTitle(title: string): string {
+  // GetSongBPM (like most music DBs) doesn't index parenthetical extras like
+  // "(feat. X)", "(Remix)", "(angrier)". Strip them.
+  return title
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .replace(/\s*-\s*(feat\.|featuring|remix|version|edit).*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function lookupBpm(apiKey: string, artist: string, title: string): Promise<number | null> {
   if (!apiKey) return null;
+  const cleanedTitle = cleanTitle(title);
+  const cleanedArtist = artist.split(/[,&]/)[0].trim();
   try {
     const url = new URL("https://api.getsong.co/search/");
     url.searchParams.set("api_key", apiKey);
     url.searchParams.set("type", "both");
-    url.searchParams.set("lookup", `song:${title} artist:${artist}`);
-    logger.info(`BPM lookup: ${url.toString()}`);
+    url.searchParams.set("lookup", `song:${cleanedTitle} artist:${cleanedArtist}`);
+    logger.info(`BPM lookup query: song="${cleanedTitle}" artist="${cleanedArtist}"`);
     const res = await fetch(url.toString());
+    const text = await res.text();
+    logger.info(`BPM response (${res.status}): ${text.slice(0, 400)}`);
     if (!res.ok) return null;
-    const data = (await res.json()) as {
-      search?: Array<{ tempo?: string }> | { error?: string };
-    };
+    let data: { search?: Array<{ tempo?: string }> | { error?: string } };
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return null;
+    }
     if (Array.isArray(data.search) && data.search[0]?.tempo) {
       const bpm = parseInt(data.search[0].tempo, 10);
       return isNaN(bpm) ? null : bpm;
@@ -164,26 +202,41 @@ export const addSong = onCall(
     const userVotesRef = db.doc(`userVotes/${uid}`);
 
     // Enrich (best-effort) with genres + BPM, before the transaction.
+    const spotifyTokenPromise = (async () => {
+      try {
+        return await getSpotifyToken(
+          SPOTIFY_CLIENT_ID.value(),
+          SPOTIFY_CLIENT_SECRET.value()
+        );
+      } catch {
+        return null;
+      }
+    })();
     const [genres, bpm] = await Promise.all([
       (async () => {
-        try {
-          const token = await getSpotifyToken(
-            SPOTIFY_CLIENT_ID.value(),
-            SPOTIFY_CLIENT_SECRET.value()
-          );
-          return await fetchArtistGenres(
-            token,
-            data.artists.map((a) => a.id).filter(Boolean)
-          );
-        } catch {
-          return [];
-        }
+        const token = await spotifyTokenPromise;
+        if (!token) return [];
+        return fetchArtistGenres(
+          token,
+          data.artists.map((a) => a.id).filter(Boolean)
+        );
       })(),
-      lookupBpm(
-        GETSONGBPM_API_KEY.value(),
-        data.artists[0]?.name ?? "",
-        data.name
-      ),
+      (async () => {
+        const token = await spotifyTokenPromise;
+        let bpm: number | null = null;
+        if (token) {
+          bpm = await fetchSpotifyTempo(token, data.trackId);
+        }
+        if (bpm == null) {
+          // Fallback to GetSongBPM (sparse coverage, but still try).
+          bpm = await lookupBpm(
+            GETSONGBPM_API_KEY.value(),
+            data.artists[0]?.name ?? "",
+            data.name
+          );
+        }
+        return bpm;
+      })(),
     ]);
 
     await db.runTransaction(async (tx) => {
@@ -248,33 +301,82 @@ export const addSong = onCall(
 const HOST_EMAIL = "bogdanripa@gmail.com";
 
 export const backfillBpm = onCall(
-  { secrets: [GETSONGBPM_API_KEY], region: "us-central1", timeoutSeconds: 300 },
+  {
+    secrets: [GETSONGBPM_API_KEY, SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET],
+    region: "us-central1",
+    timeoutSeconds: 300,
+  },
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
     if (req.auth.token.email !== HOST_EMAIL) {
       throw new HttpsError("permission-denied", "Host only");
     }
-    const apiKey = GETSONGBPM_API_KEY.value();
-    if (!apiKey) throw new HttpsError("failed-precondition", "BPM API key missing");
 
     const db = getFirestore();
     const snap = await db.collection("songs").get();
-    let updated = 0;
-    let skipped = 0;
+    const apiKey = GETSONGBPM_API_KEY.value();
+
+    let bpmUpdated = 0;
+    let genresUpdated = 0;
+
+    // Spotify token (optional — only needed for genre refetch).
+    let spotifyToken: string | null = null;
+    try {
+      spotifyToken = await getSpotifyToken(
+        SPOTIFY_CLIENT_ID.value(),
+        SPOTIFY_CLIENT_SECRET.value()
+      );
+    } catch (e) {
+      logger.warn("Could not get Spotify token for genre backfill", e);
+    }
+
     for (const doc of snap.docs) {
       const data = doc.data();
-      if (data.bpm != null) { skipped++; continue; }
-      const title = data.name as string;
-      const artist = (data.artists as Array<{ name: string }>)?.[0]?.name ?? "";
-      const bpm = await lookupBpm(apiKey, artist, title);
-      if (bpm != null) {
-        await doc.ref.update({ bpm });
-        updated++;
+      const updates: Record<string, unknown> = {};
+
+      if (data.bpm == null) {
+        let bpm: number | null = null;
+        if (spotifyToken) {
+          bpm = await fetchSpotifyTempo(spotifyToken, doc.id);
+        }
+        if (bpm == null) {
+          const title = data.name as string;
+          const artist = (data.artists as Array<{ name: string }>)?.[0]?.name ?? "";
+          bpm = await lookupBpm(apiKey, artist, title);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+        if (bpm != null) {
+          updates.bpm = bpm;
+          bpmUpdated++;
+        }
       }
-      // GetSongBPM is rate-limited; sleep briefly between calls.
-      await new Promise((r) => setTimeout(r, 250));
+
+      if (
+        spotifyToken &&
+        (!Array.isArray(data.genres) || data.genres.length === 0)
+      ) {
+        const ids = (data.artists as Array<{ id: string }>)
+          ?.map((a) => a.id)
+          .filter(Boolean) ?? [];
+        const genres = await fetchArtistGenres(spotifyToken, ids);
+        if (genres.length > 0) {
+          updates.genres = genres;
+          genresUpdated++;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await doc.ref.update(updates);
+      }
     }
-    return { updated, skipped, total: snap.size };
+    return {
+      total: snap.size,
+      bpmUpdated,
+      genresUpdated,
+      // legacy fields for compatibility
+      updated: bpmUpdated,
+      skipped: snap.size - bpmUpdated,
+    };
   }
 );
 
