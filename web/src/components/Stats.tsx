@@ -4,15 +4,18 @@ import {
 } from "recharts";
 import type { Song } from "../types";
 import type { VoteCounts } from "../api";
+import type { Filters } from "../filters";
 
 interface Props {
   songs: Song[];
   voteCounts: VoteCounts;
+  filters?: Filters;
+  onFilter?: (next: Filters) => void;
 }
 
 const COLORS = ["#ff7a6b", "#ffb86b", "#ffd76b", "#a3e36b", "#6be3c8", "#6bbfff", "#a06bff", "#ff6bd9"];
 
-export function Stats({ songs, voteCounts }: Props) {
+export function Stats({ songs, voteCounts, filters, onFilter }: Props) {
   const genreData = useMemo(() => {
     const map = new Map<string, number>();
     let untagged = 0;
@@ -131,7 +134,14 @@ export function Stats({ songs, voteCounts }: Props) {
         <h3>Top contributors</h3>
         <ul className="contribs">
           {contributors.map((c) => (
-            <li key={c.uid} title={`${c.songs} songs + ${c.votes} votes`}>
+            <li
+              key={c.uid}
+              title={`${c.songs} songs + ${c.votes} votes — click to filter`}
+              className={onFilter ? "clickable" : ""}
+              onClick={() =>
+                onFilter && onFilter({ ...filters, adder: { uid: c.uid, name: c.name } })
+              }
+            >
               {c.photoURL && <img src={c.photoURL} alt="" />}
               <span className="cn">{c.name}</span>
               <span className="cc">{c.total} pts</span>

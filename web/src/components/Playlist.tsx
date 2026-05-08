@@ -4,13 +4,17 @@ import { auth } from "../firebase";
 import type { Song } from "../types";
 import { PreviewButton, SpotifyEmbed } from "./PreviewButton";
 
+import type { Filters } from "../filters";
+
 interface Props {
   songs: Song[];
   myVotes: VoteMap;
   showToast: (msg: string, kind?: "info" | "success" | "error") => void;
+  filters: Filters;
+  onFilter: (next: Filters) => void;
 }
 
-export function Playlist({ songs, myVotes, showToast }: Props) {
+export function Playlist({ songs, myVotes, showToast, filters, onFilter }: Props) {
   const myUid = auth.currentUser?.uid;
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -33,8 +37,20 @@ export function Playlist({ songs, myVotes, showToast }: Props) {
   const [pending, setPending] = useState<Record<string, "up" | "down" | null>>({});
 
   if (songs.length === 0) {
+    const isFiltered = !!(filters.adder || filters.genre || filters.artist);
     return (
-      <div className="empty">No songs yet — be the first to add one!</div>
+      <div className="empty">
+        {isFiltered ? (
+          <>
+            No songs match the current filter.{" "}
+            <button className="ghost inline" onClick={() => onFilter({})}>
+              Clear filters
+            </button>
+          </>
+        ) : (
+          "No songs yet — be the first to add one!"
+        )}
+      </div>
     );
   }
 
@@ -81,14 +97,49 @@ export function Playlist({ songs, myVotes, showToast }: Props) {
                 <div className="title">
                   {s.name} {s.explicit && <span className="explicit">E</span>}
                 </div>
-                <div className="artist">{s.artistNames}</div>
+                <div className="artist">
+                  {s.artists.map((a, i) => (
+                    <span key={a.id || a.name}>
+                      {i > 0 && ", "}
+                      <button
+                        className="filterable"
+                        onClick={() => onFilter({ ...filters, artist: a.name })}
+                        title={`Filter by ${a.name}`}
+                      >
+                        {a.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
                 <div className="sub">
                   <span>{s.album}</span>
-                  {s.genres?.[0] && <span> · {s.genres[0]}</span>}
+                  {s.genres?.[0] && (
+                    <>
+                      {" · "}
+                      <button
+                        className="filterable"
+                        onClick={() => onFilter({ ...filters, genre: s.genres[0] })}
+                        title={`Filter by ${s.genres[0]}`}
+                      >
+                        {s.genres[0]}
+                      </button>
+                    </>
+                  )}
                 </div>
                 <div className="added-by">
-                  {s.addedBy.photoURL && <img src={s.addedBy.photoURL} alt="" />}
-                  <span>added by {s.addedBy.name}</span>
+                  <button
+                    className="filterable adder-link"
+                    onClick={() =>
+                      onFilter({
+                        ...filters,
+                        adder: { uid: s.addedBy.uid, name: s.addedBy.name },
+                      })
+                    }
+                    title={`Filter by ${s.addedBy.name}`}
+                  >
+                    {s.addedBy.photoURL && <img src={s.addedBy.photoURL} alt="" />}
+                    <span>added by {s.addedBy.name}</span>
+                  </button>
                   {s.addedBy.uid === myUid && (
                     <button
                       className="delete-song"

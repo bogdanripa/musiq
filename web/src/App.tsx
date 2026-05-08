@@ -15,6 +15,8 @@ import { AddSong } from "./components/AddSong";
 import { Stats } from "./components/Stats";
 import { ExportToSpotify } from "./components/ExportToSpotify";
 import { Toast } from "./components/Toast";
+import { FilterBar } from "./components/FilterBar";
+import { filterSongs, type Filters } from "./filters";
 import "./App.css";
 
 const HOST_EMAIL = "bogdanripa@gmail.com";
@@ -28,6 +30,7 @@ export default function App() {
   const [myVotes, setMyVotes] = useState<VoteMap>({});
   const [voteCounts, setVoteCounts] = useState<VoteCounts>({});
   const [toast, setToast] = useState<ToastState>(null);
+  const [filters, setFilters] = useState<Filters>({});
 
   useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u); setAuthReady(true); }), []);
 
@@ -51,6 +54,8 @@ export default function App() {
     [songs, user]
   );
 
+  const filteredSongs = useMemo(() => filterSongs(songs, filters), [songs, filters]);
+
   const showToast = useCallback(
     (message: string, kind: "info" | "success" | "error" = "info") =>
       setToast({ message, kind }),
@@ -73,13 +78,31 @@ export default function App() {
         </div>
       </header>
 
-      <Stats songs={songs} voteCounts={voteCounts} />
+      <Stats
+        songs={filteredSongs}
+        voteCounts={voteCounts}
+        filters={filters}
+        onFilter={setFilters}
+      />
 
       {user.email === HOST_EMAIL && <ExportToSpotify songs={songs} showToast={showToast} />}
 
       <AddSong songs={songs} myCount={myCount} myVotes={myVotes} showToast={showToast} />
 
-      <Playlist songs={songs} myVotes={myVotes} showToast={showToast} />
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        totalCount={songs.length}
+        filteredCount={filteredSongs.length}
+      />
+
+      <Playlist
+        songs={filteredSongs}
+        myVotes={myVotes}
+        showToast={showToast}
+        filters={filters}
+        onFilter={setFilters}
+      />
 
       <footer className="footer">Made for the party 🎈</footer>
 
