@@ -380,6 +380,39 @@ export const backfillBpm = onCall(
   }
 );
 
+export const debugDump = onCall({ region: "us-central1" }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  if (req.auth.token.email !== HOST_EMAIL) {
+    throw new HttpsError("permission-denied", "Host only");
+  }
+  const db = getFirestore();
+  const [songsSnap, votesSnap, usersSnap] = await Promise.all([
+    db.collection("songs").get(),
+    db.collection("userVotes").get(),
+    db.collection("users").get(),
+  ]);
+  const songs = songsSnap.docs.map((d) => ({
+    id: d.id,
+    name: d.data().name,
+    score: d.data().score,
+    addedBy: d.data().addedBy?.name,
+  }));
+  const userNames: Record<string, string> = {};
+  for (const u of usersSnap.docs) {
+    userNames[u.id] = u.data().displayName ?? "(no name)";
+  }
+  const votes = votesSnap.docs.map((d) => {
+    const map = (d.data().votes ?? {}) as Record<string, number>;
+    return {
+      uid: d.id,
+      name: userNames[d.id] ?? "(unknown)",
+      voteCount: Object.keys(map).length,
+      sampleVotes: Object.entries(map).slice(0, 3),
+    };
+  });
+  return { songs, votes };
+});
+
 export const removeSong = onCall({ region: "us-central1" }, async (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
   const uid = req.auth.uid;
