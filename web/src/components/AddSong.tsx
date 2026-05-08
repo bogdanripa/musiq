@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import { addSong, searchSpotify } from "../api";
+import { addSong, castVote, searchSpotify, type VoteMap } from "../api";
 import type { SearchTrack, Song } from "../types";
-import { PreviewButton } from "./PreviewButton";
+import { PreviewButton, SpotifyEmbed } from "./PreviewButton";
 
 interface Props {
   songs: Song[];
   myCount: number;
+  myVotes: VoteMap;
+  showToast: (msg: string, kind?: "info" | "success" | "error") => void;
 }
 
 const SONG_CAP = 5;
 
-export function AddSong({ songs, myCount }: Props) {
+export function AddSong({ songs, myCount, myVotes, showToast }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchTrack[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
 
   const existingIds = new Set(songs.map((s) => s.trackId));
@@ -46,12 +49,28 @@ export function AddSong({ songs, myCount }: Props) {
     setAdding(t.id);
     setError(null);
     try {
+      if (existingIds.has(t.id)) {
+        // Already in the playlist — turn the click into an upvote (unless
+        // they already upvoted, in which case just say so).
+        const existing = myVotes[t.id] ?? 0;
+        if (existing === 1) {
+          showToast(`"${t.name}" is already in the playlist — you've upvoted it.`, "info");
+        } else {
+          await castVote(t.id, 1);
+          showToast(`"${t.name}" was already added — upvoted for you. 👍`, "success");
+        }
+        setQuery("");
+        setResults([]);
+        return;
+      }
       await addSong(t);
+      showToast(`Added "${t.name}". 🎵`, "success");
       setQuery("");
       setResults([]);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Could not add song.";
       setError(msg);
+      showToast(msg, "error");
     } finally {
       setAdding(null);
     }
@@ -60,21 +79,25 @@ export function AddSong({ songs, myCount }: Props) {
   return (
     <section className="add-song">
       <div className="add-header">
-        <h2>Add a song</h2>
+        <h2>🎵 Add a song to the playlist</h2>
         <span className="cap">
           {remaining > 0
             ? `${remaining} of ${SONG_CAP} picks left`
             : `You've used all ${SONG_CAP} picks`}
         </span>
       </div>
-      <input
-        className="search"
-        type="search"
-        placeholder="Search Spotify by song or artist…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        disabled={remaining <= 0}
-      />
+      <div className="search-wrap">
+        <span className="search-icon" aria-hidden>🔎</span>
+        <input
+          className="search"
+          type="search"
+          placeholder="Search Spotify — type a song or artist name…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          disabled={remaining <= 0}
+          autoFocus
+        />
+      </div>
       {error && <div className="error">{error}</div>}
       {loading && <div className="loading">Searching…</div>}
       {results.length > 0 && (
@@ -82,28 +105,39 @@ export function AddSong({ songs, myCount }: Props) {
           {results.map((t) => {
             const already = existingIds.has(t.id);
             return (
-              <li key={t.id} className="result">
-                {t.coverUrl ? (
-                  <img src={t.coverUrl} alt="" />
-                ) : (
-                  <div className="cover placeholder small" />
-                )}
-                <div className="meta">
-                  <div className="title">
-                    {t.name} {t.explicit && <span className="explicit">E</span>}
+              <li key={t.id} className="result-wrap">
+                <div className="result">
+                  {t.coverUrl ? (
+                    <img src={t.coverUrl} alt="" />
+                  ) : (
+                    <div className="cover placeholder small" />
+                  )}
+                  <div className="meta">
+                    <div className="title">
+                      {t.name} {t.explicit && <span className="explicit">E</span>}
+                    </div>
+                    <div className="artist">
+                      {t.artists.map((a) => a.name).join(", ")} · {t.album}
+                    </div>
                   </div>
-                  <div className="artist">
-                    {t.artists.map((a) => a.name).join(", ")} · {t.album}
-                  </div>
+                  <PreviewButton
+                    active={playingId === t.id}
+                    onToggle={() => setPlayingId((id) => (id === t.id ? null : t.id))}
+                    size="sm"
+                  />
+                  <button
+                    className="primary"
+                    disabled={adding === t.id || (already && (myVotes[t.id] ?? 0) === 1) || (!already && remaining <= 0)}
+                    onClick={() => onAdd(t)}
+                  >
+                    {adding === t.id
+                      ? "…"
+                      : already
+                        ? (myVotes[t.id] ?? 0) === 1 ? "✓ Upvoted" : "👍 Upvote"
+                        : "Add"}
+                  </button>
                 </div>
-                <PreviewButton url={t.previewUrl} size="sm" />
-                <button
-                  className="primary"
-                  disabled={already || adding === t.id || remaining <= 0}
-                  onClick={() => onAdd(t)}
-                >
-                  {already ? "Already added" : adding === t.id ? "Adding…" : "Add"}
-                </button>
+                {playingId === t.id && <SpotifyEmbed trackId={t.id} />}
               </li>
             );
           })}

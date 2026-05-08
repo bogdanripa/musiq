@@ -9,7 +9,9 @@ A collaborative playlist app for the party. Guests sign in with Google, search S
 - **DB**: Firestore (`songs`, `users`, `userVotes`)
 - **Auth**: Firebase Auth — Google sign-in
 - **Stats**: Recharts (genre piechart, BPM histogram, top contributors, totals)
-- BPM lookups via [GetSongBPM](https://getsongbpm.com) (free, attribution shown in footer)
+- BPM lookups via [Get Song BPM](https://getsongbpm.com) (free, attribution shown in footer)
+
+> BPM data provided by [Get Song BPM](https://getsongbpm.com) — used under their free API with attribution.
 - **CI/CD**: GitHub Actions auto-deploys on push to `main`
 
 ## One-time setup

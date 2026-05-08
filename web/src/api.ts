@@ -18,10 +18,18 @@ const _addSong = httpsCallable<Record<string, unknown>, { ok: true }>(
   functions,
   "addSong"
 );
+const _removeSong = httpsCallable<{ trackId: string }, { ok: true }>(
+  functions,
+  "removeSong"
+);
 
 export async function searchSpotify(q: string): Promise<SearchTrack[]> {
   const res = await _spotifySearch({ q });
   return res.data.tracks;
+}
+
+export async function removeSong(trackId: string): Promise<void> {
+  await _removeSong({ trackId });
 }
 
 export async function addSong(track: SearchTrack): Promise<void> {

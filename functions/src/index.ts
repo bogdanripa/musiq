@@ -243,3 +243,29 @@ export const addSong = onCall(
     return { ok: true };
   }
 );
+
+export const removeSong = onCall({ region: "us-central1" }, async (req) => {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+  const uid = req.auth.uid;
+  const trackId = String(req.data?.trackId ?? "").trim();
+  if (!trackId) throw new HttpsError("invalid-argument", "Missing trackId");
+
+  const db = getFirestore();
+  const songRef = db.doc(`songs/${trackId}`);
+  const userRef = db.doc(`users/${uid}`);
+
+  await db.runTransaction(async (tx) => {
+    const songSnap = await tx.get(songRef);
+    if (!songSnap.exists) {
+      throw new HttpsError("not-found", "Song no longer exists");
+    }
+    const data = songSnap.data()!;
+    if (data.addedBy?.uid !== uid) {
+      throw new HttpsError("permission-denied", "You can only delete your own songs");
+    }
+    tx.delete(songRef);
+    tx.update(userRef, { songCount: FieldValue.increment(-1) });
+  });
+
+  return { ok: true };
+});
