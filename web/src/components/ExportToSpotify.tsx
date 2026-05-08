@@ -28,7 +28,7 @@ export function ExportToSpotify({ songs, showToast }: Props) {
     (async () => {
       try {
         const existing = await getExportInfo();
-        const name = `Body's Birthday — ${new Date().toLocaleDateString()}`;
+        const name = "Body's 47th";
         const result = await exportToSpotify(
           cb,
           songs,
