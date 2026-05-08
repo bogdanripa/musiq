@@ -86,6 +86,12 @@ export function Stats({ songs, allSongs, allVotes, filters, onFilter }: Props) {
   const totalSongs = songs.length;
   const totalDuration = songs.reduce((sum, s) => sum + (s.durationMs ?? 0), 0);
   const totalMin = Math.round(totalDuration / 60000);
+  const totalContributors = useMemo(() => {
+    const uids = new Set<string>();
+    for (const s of allSongs) uids.add(s.addedBy.uid);
+    for (const uid of Object.keys(allVotes)) uids.add(uid);
+    return uids.size;
+  }, [allSongs, allVotes]);
   // Engagement votes = votes cast on songs added by someone else
   // (excludes the auto-upvote each adder gives their own pick).
   const totalVotes = useMemo(() => {
@@ -106,6 +112,7 @@ export function Stats({ songs, allSongs, allVotes, filters, onFilter }: Props) {
       <div className="stat-card numbers">
         <div className="num"><span>{totalSongs}</span> songs</div>
         <div className="num"><span>{totalVotes}</span> votes</div>
+        <div className="num"><span>{totalContributors}</span> contributors</div>
         <div className="num"><span>{totalMin}</span> min</div>
       </div>
 
