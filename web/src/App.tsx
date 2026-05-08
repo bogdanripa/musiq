@@ -5,7 +5,9 @@ import {
   subscribeAllVotes,
   subscribeMyVotes,
   subscribeSongs,
+  subscribeUsers,
   type AllVotes,
+  type UserDirectory,
   type VoteMap,
 } from "./api";
 import type { Song } from "./types";
@@ -30,6 +32,7 @@ export default function App() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [myVotes, setMyVotes] = useState<VoteMap>({});
   const [allVotes, setAllVotes] = useState<AllVotes>({});
+  const [users, setUsers] = useState<UserDirectory>({});
   const [toast, setToast] = useState<ToastState>(null);
   const [filters, setFilters] = useState<Filters>({});
 
@@ -48,6 +51,11 @@ export default function App() {
   useEffect(() => {
     if (!user) { setAllVotes({}); return; }
     return subscribeAllVotes(setAllVotes);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setUsers({}); return; }
+    return subscribeUsers(setUsers);
   }, [user]);
 
   const myCount = useMemo(
@@ -109,6 +117,8 @@ export default function App() {
         showToast={showToast}
         filters={filters}
         onFilter={setFilters}
+        allVotes={allVotes}
+        users={users}
       />
 
       <footer className="footer">Made for the party 🎈</footer>

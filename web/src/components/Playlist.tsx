@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { castVote, removeSong, type VoteMap } from "../api";
+import { useMemo, useState } from "react";
+import {
+  castVote,
+  removeSong,
+  type AllVotes,
+  type UserDirectory,
+  type VoteMap,
+} from "../api";
 import { auth } from "../firebase";
 import type { Song } from "../types";
 import { PreviewButton, SpotifyEmbed } from "./PreviewButton";
@@ -12,9 +18,19 @@ interface Props {
   showToast: (msg: string, kind?: "info" | "success" | "error") => void;
   filters: Filters;
   onFilter: (next: Filters) => void;
+  allVotes: AllVotes;
+  users: UserDirectory;
 }
 
-export function Playlist({ songs, myVotes, showToast, filters, onFilter }: Props) {
+export function Playlist({
+  songs,
+  myVotes,
+  showToast,
+  filters,
+  onFilter,
+  allVotes,
+  users,
+}: Props) {
   const myUid = auth.currentUser?.uid;
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -77,6 +93,27 @@ export function Playlist({ songs, myVotes, showToast, filters, onFilter }: Props
   const togglePlay = (trackId: string) => {
     setPlayingId((current) => (current === trackId ? null : trackId));
   };
+
+  // For each trackId: list of voter names (excluding the song's adder).
+  // Direction (up/down) is intentionally hidden.
+  const votersByTrack = useMemo(() => {
+    const adderByTrack = new Map<string, string>();
+    for (const s of songs) adderByTrack.set(s.trackId, s.addedBy.uid);
+    const map = new Map<string, string[]>();
+    for (const [uid, votes] of Object.entries(allVotes)) {
+      for (const trackId of Object.keys(votes)) {
+        const adder = adderByTrack.get(trackId);
+        if (!adder || adder === uid) continue;
+        const name = users[uid]?.displayName ?? null;
+        if (!name) continue;
+        const arr = map.get(trackId) ?? [];
+        arr.push(name);
+        map.set(trackId, arr);
+      }
+    }
+    for (const [k, arr] of map) arr.sort((a, b) => a.localeCompare(b));
+    return map;
+  }, [songs, allVotes, users]);
 
   return (
     <ol className="playlist">
@@ -164,11 +201,23 @@ export function Playlist({ songs, myVotes, showToast, filters, onFilter }: Props
                   <span className="arrow">▲</span>
                   <span className="vlabel">Up</span>
                 </button>
-                <div
-                  className={`score ${s.score > 0 ? "pos" : s.score < 0 ? "neg" : ""}`}
-                  title={`Net votes: ${s.score}`}
-                >
-                  {s.score > 0 ? `+${s.score}` : s.score}
+                <div className="score-wrap">
+                  <div
+                    className={`score ${s.score > 0 ? "pos" : s.score < 0 ? "neg" : ""}`}
+                    tabIndex={0}
+                  >
+                    {s.score > 0 ? `+${s.score}` : s.score}
+                  </div>
+                  {(votersByTrack.get(s.trackId)?.length ?? 0) > 0 && (
+                    <div className="voters-pop" role="tooltip">
+                      <div className="vp-title">Voted by</div>
+                      <ul>
+                        {votersByTrack.get(s.trackId)!.map((n) => (
+                          <li key={n}>{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 <button
                   className={`vote down ${myVote === -1 ? "active" : ""} ${busy === "down" ? "loading" : ""}`}

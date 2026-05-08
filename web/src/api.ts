@@ -99,6 +99,26 @@ export function subscribeAllVotes(cb: (all: AllVotes) => void): () => void {
   });
 }
 
+export interface UserProfile {
+  displayName: string | null;
+  photoURL: string | null;
+}
+export type UserDirectory = Record<string, UserProfile>;
+
+export function subscribeUsers(cb: (users: UserDirectory) => void): () => void {
+  return onSnapshot(collection(db, "users"), (snap) => {
+    const dir: UserDirectory = {};
+    for (const d of snap.docs) {
+      const data = d.data();
+      dir[d.id] = {
+        displayName: (data.displayName as string) ?? null,
+        photoURL: (data.photoURL as string) ?? null,
+      };
+    }
+    cb(dir);
+  });
+}
+
 export interface ExportInfo {
   playlistId: string;
   playlistUrl: string;

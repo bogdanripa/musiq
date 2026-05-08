@@ -341,15 +341,59 @@ button.ghost {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 0.9; }
 }
+.score-wrap { position: relative; display: flex; justify-content: center; }
 .score {
   font-variant-numeric: tabular-nums;
   font-size: 0.95rem;
   font-weight: 700;
   text-align: center;
   padding: 2px 0;
+  cursor: help;
+  outline: none;
 }
 .score.pos { color: var(--pos); }
 .score.neg { color: var(--neg); }
+
+.voters-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 160px;
+  max-width: 240px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.6);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.score-wrap:hover .voters-pop,
+.score-wrap:focus-within .voters-pop {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.voters-pop .vp-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.voters-pop ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
 .toast {
   position: fixed;
