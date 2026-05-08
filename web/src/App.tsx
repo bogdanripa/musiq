@@ -102,7 +102,13 @@ export default function App() {
         </>
       )}
 
-      <AddSong songs={songs} myCount={myCount} myVotes={myVotes} showToast={showToast} />
+      <AddSong
+        songs={songs}
+        myCount={myCount}
+        myVotes={myVotes}
+        showToast={showToast}
+        unlimited={user.email === HOST_EMAIL}
+      />
 
       <FilterBar
         filters={filters}

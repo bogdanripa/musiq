@@ -12,6 +12,8 @@ const GETSONGBPM_API_KEY = defineSecret("GETSONGBPM_API_KEY");
 
 const SONG_CAP = 5;
 
+const HOST_EMAIL = "bogdanripa@gmail.com";
+
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 async function getSpotifyToken(clientId: string, clientSecret: string): Promise<string> {
@@ -249,7 +251,8 @@ export const addSong = onCall(
         throw new HttpsError("already-exists", "This song is already in the playlist");
       }
       const currentCount = userSnap.exists ? (userSnap.data()?.songCount ?? 0) : 0;
-      if (currentCount >= SONG_CAP) {
+      const isHost = profile.email === HOST_EMAIL;
+      if (!isHost && currentCount >= SONG_CAP) {
         throw new HttpsError(
           "failed-precondition",
           `You've already added ${SONG_CAP} songs — the limit per person.`
@@ -297,8 +300,6 @@ export const addSong = onCall(
     return { ok: true };
   }
 );
-
-const HOST_EMAIL = "bogdanripa@gmail.com";
 
 export const backfillBpm = onCall(
   {
