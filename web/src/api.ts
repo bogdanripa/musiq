@@ -100,6 +100,37 @@ export function subscribeAllVotes(cb: (all: AllVotes) => void): () => void {
   });
 }
 
+// Per-user song limits stored at meta/limits
+export interface Limits {
+  default: number;
+  perUser: Record<string, number>;
+}
+
+export function subscribeLimits(cb: (l: Limits) => void): () => void {
+  return onSnapshot(doc(db, "meta", "limits"), (snap) => {
+    const d = snap.data();
+    cb({
+      default: typeof d?.default === "number" ? d.default : 5,
+      perUser: (d?.perUser as Record<string, number>) ?? {},
+    });
+  });
+}
+
+export async function setUserLimit(uid: string, limit: number | null) {
+  // null clears the per-user override
+  const ref = doc(db, "meta", "limits");
+  const snap = await getDoc(ref);
+  const cur = (snap.data() as Limits | undefined) ?? { default: 5, perUser: {} };
+  const perUser = { ...cur.perUser };
+  if (limit == null) delete perUser[uid];
+  else perUser[uid] = limit;
+  await setDoc(ref, { default: cur.default, perUser }, { merge: true });
+}
+
+export async function setDefaultLimit(limit: number) {
+  await setDoc(doc(db, "meta", "limits"), { default: limit }, { merge: true });
+}
+
 export interface UserProfile {
   displayName: string | null;
   photoURL: string | null;

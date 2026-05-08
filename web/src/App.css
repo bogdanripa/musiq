@@ -239,16 +239,42 @@ button.ghost {
 
 .filterbar {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px 14px;
   margin-bottom: 12px;
 }
+.fb-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .fb-label { color: var(--muted); font-size: 0.85rem; margin-right: auto; }
+.limits-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.85rem;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.lf-label { color: var(--muted); }
+.lf-input {
+  width: 70px;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 0.9rem;
+}
+.lf-hint { color: var(--muted); font-size: 0.75rem; }
+.lf-divider { color: var(--muted); padding: 0 6px; }
 .fb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   background: rgba(255, 215, 107, 0.15);

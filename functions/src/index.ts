@@ -252,10 +252,21 @@ export const addSong = onCall(
       }
       const currentCount = userSnap.exists ? (userSnap.data()?.songCount ?? 0) : 0;
       const isHost = profile.email === HOST_EMAIL;
-      if (!isHost && currentCount >= SONG_CAP) {
+      // Resolve per-user limit: override > host(unlimited) > default(SONG_CAP)
+      const limitsSnap = await tx.get(db.doc("meta/limits"));
+      const limits = limitsSnap.exists ? limitsSnap.data() : null;
+      const override = limits?.perUser?.[uid];
+      const defaultCap = typeof limits?.default === "number" ? limits.default : SONG_CAP;
+      const cap =
+        typeof override === "number"
+          ? override
+          : isHost
+            ? Infinity
+            : defaultCap;
+      if (currentCount >= cap) {
         throw new HttpsError(
           "failed-precondition",
-          `You've already added ${SONG_CAP} songs — the limit per person.`
+          `You've already added ${cap} songs — your limit.`
         );
       }
       tx.set(songRef, {

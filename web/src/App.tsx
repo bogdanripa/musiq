@@ -3,10 +3,12 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebas
 import { auth, googleProvider } from "./firebase";
 import {
   subscribeAllVotes,
+  subscribeLimits,
   subscribeMyVotes,
   subscribeSongs,
   subscribeUsers,
   type AllVotes,
+  type Limits,
   type UserDirectory,
   type VoteMap,
 } from "./api";
@@ -33,6 +35,7 @@ export default function App() {
   const [myVotes, setMyVotes] = useState<VoteMap>({});
   const [allVotes, setAllVotes] = useState<AllVotes>({});
   const [users, setUsers] = useState<UserDirectory>({});
+  const [limits, setLimits] = useState<Limits>({ default: 5, perUser: {} });
   const [toast, setToast] = useState<ToastState>(null);
   const [filters, setFilters] = useState<Filters>({});
 
@@ -56,6 +59,11 @@ export default function App() {
   useEffect(() => {
     if (!user) { setUsers({}); return; }
     return subscribeUsers(setUsers);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    return subscribeLimits(setLimits);
   }, [user]);
 
   const myCount = useMemo(
@@ -107,7 +115,13 @@ export default function App() {
         myCount={myCount}
         myVotes={myVotes}
         showToast={showToast}
-        unlimited={user.email === HOST_EMAIL}
+        cap={
+          typeof limits.perUser[user.uid] === "number"
+            ? limits.perUser[user.uid]
+            : user.email === HOST_EMAIL
+              ? Infinity
+              : limits.default
+        }
       />
 
       <FilterBar
@@ -115,6 +129,9 @@ export default function App() {
         onChange={setFilters}
         totalCount={songs.length}
         filteredCount={filteredSongs.length}
+        isHost={user.email === HOST_EMAIL}
+        limits={limits}
+        showToast={showToast}
       />
 
       <Playlist

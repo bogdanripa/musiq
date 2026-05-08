@@ -8,12 +8,10 @@ interface Props {
   myCount: number;
   myVotes: VoteMap;
   showToast: (msg: string, kind?: "info" | "success" | "error") => void;
-  unlimited?: boolean;
+  cap: number; // Infinity for unlimited
 }
 
-const SONG_CAP = 5;
-
-export function AddSong({ songs, myCount, myVotes, showToast, unlimited }: Props) {
+export function AddSong({ songs, myCount, myVotes, showToast, cap }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchTrack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,7 +21,8 @@ export function AddSong({ songs, myCount, myVotes, showToast, unlimited }: Props
   const debounceRef = useRef<number | null>(null);
 
   const existingIds = new Set(songs.map((s) => s.trackId));
-  const remaining = unlimited ? Infinity : SONG_CAP - myCount;
+  const unlimited = !isFinite(cap);
+  const remaining = unlimited ? Infinity : Math.max(0, cap - myCount);
 
   useEffect(() => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
@@ -83,10 +82,10 @@ export function AddSong({ songs, myCount, myVotes, showToast, unlimited }: Props
         <h2>🎵 Add a song to the playlist</h2>
         <span className="cap">
           {unlimited
-            ? `${myCount} added (host — no limit)`
+            ? `${myCount} added (no limit)`
             : remaining > 0
-              ? `${remaining} of ${SONG_CAP} picks left`
-              : `You've used all ${SONG_CAP} picks`}
+              ? `${remaining} of ${cap} picks left`
+              : `You've used all ${cap} picks`}
         </span>
       </div>
       <div className="search-wrap">
