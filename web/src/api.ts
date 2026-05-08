@@ -22,6 +22,15 @@ const _removeSong = httpsCallable<{ trackId: string }, { ok: true }>(
   functions,
   "removeSong"
 );
+const _backfillBpm = httpsCallable<
+  unknown,
+  { updated: number; skipped: number; total: number }
+>(functions, "backfillBpm");
+
+export async function backfillBpm() {
+  const res = await _backfillBpm();
+  return res.data;
+}
 
 export async function searchSpotify(q: string): Promise<SearchTrack[]> {
   const res = await _spotifySearch({ q });
@@ -59,6 +68,19 @@ export function subscribeMyVotes(uid: string, cb: (v: VoteMap) => void): () => v
   return onSnapshot(ref, (snap) => {
     const data = snap.data();
     cb((data?.votes as VoteMap) ?? {});
+  });
+}
+
+export type VoteCounts = Record<string, number>;
+
+export function subscribeAllVoteCounts(cb: (counts: VoteCounts) => void): () => void {
+  return onSnapshot(collection(db, "userVotes"), (snap) => {
+    const counts: VoteCounts = {};
+    for (const d of snap.docs) {
+      const votes = (d.data().votes ?? {}) as Record<string, unknown>;
+      counts[d.id] = Object.keys(votes).length;
+    }
+    cb(counts);
   });
 }
 

@@ -3,12 +3,16 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from "recharts";
 import type { Song } from "../types";
+import type { VoteCounts } from "../api";
 
-interface Props { songs: Song[]; }
+interface Props {
+  songs: Song[];
+  voteCounts: VoteCounts;
+}
 
 const COLORS = ["#ff7a6b", "#ffb86b", "#ffd76b", "#a3e36b", "#6be3c8", "#6bbfff", "#a06bff", "#ff6bd9"];
 
-export function Stats({ songs }: Props) {
+export function Stats({ songs, voteCounts }: Props) {
   const genreData = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of songs) {
@@ -37,15 +41,35 @@ export function Stats({ songs }: Props) {
   }, [songs]);
 
   const contributors = useMemo(() => {
-    const map = new Map<string, { name: string; photoURL: string | null; count: number; score: number }>();
+    type Entry = {
+      uid: string;
+      name: string;
+      photoURL: string | null;
+      songs: number;
+      votes: number;
+    };
+    const map = new Map<string, Entry>();
     for (const s of songs) {
-      const e = map.get(s.addedBy.uid) ?? { name: s.addedBy.name, photoURL: s.addedBy.photoURL, count: 0, score: 0 };
-      e.count += 1;
-      e.score += s.score;
+      const e = map.get(s.addedBy.uid) ?? {
+        uid: s.addedBy.uid,
+        name: s.addedBy.name,
+        photoURL: s.addedBy.photoURL,
+        songs: 0,
+        votes: 0,
+      };
+      e.songs += 1;
       map.set(s.addedBy.uid, e);
     }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 5);
-  }, [songs]);
+    for (const [uid, count] of Object.entries(voteCounts)) {
+      const e = map.get(uid);
+      if (e) e.votes = count;
+      // Voters who never added a song are skipped — we have no name for them.
+    }
+    return Array.from(map.values())
+      .map((e) => ({ ...e, total: e.songs + e.votes }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  }, [songs, voteCounts]);
 
   const totalSongs = songs.length;
   const totalVotes = songs.reduce((sum, s) => sum + Math.abs(s.score), 0);
@@ -99,10 +123,10 @@ export function Stats({ songs }: Props) {
         <h3>Top contributors</h3>
         <ul className="contribs">
           {contributors.map((c) => (
-            <li key={c.name}>
+            <li key={c.uid} title={`${c.songs} songs + ${c.votes} votes`}>
               {c.photoURL && <img src={c.photoURL} alt="" />}
               <span className="cn">{c.name}</span>
-              <span className="cc">{c.count} {c.count === 1 ? "song" : "songs"}</span>
+              <span className="cc">{c.total} pts</span>
             </li>
           ))}
           {contributors.length === 0 && <li className="muted">No songs yet</li>}

@@ -114,7 +114,8 @@ async function lookupBpm(apiKey: string, artist: string, title: string): Promise
     const url = new URL("https://api.getsong.co/search/");
     url.searchParams.set("api_key", apiKey);
     url.searchParams.set("type", "both");
-    url.searchParams.set("lookup", `song:${title}artist:${artist}`);
+    url.searchParams.set("lookup", `song:${title} artist:${artist}`);
+    logger.info(`BPM lookup: ${url.toString()}`);
     const res = await fetch(url.toString());
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -241,6 +242,39 @@ export const addSong = onCall(
     });
 
     return { ok: true };
+  }
+);
+
+const HOST_EMAIL = "bogdanripa@gmail.com";
+
+export const backfillBpm = onCall(
+  { secrets: [GETSONGBPM_API_KEY], region: "us-central1", timeoutSeconds: 300 },
+  async (req) => {
+    if (!req.auth) throw new HttpsError("unauthenticated", "Sign in required");
+    if (req.auth.token.email !== HOST_EMAIL) {
+      throw new HttpsError("permission-denied", "Host only");
+    }
+    const apiKey = GETSONGBPM_API_KEY.value();
+    if (!apiKey) throw new HttpsError("failed-precondition", "BPM API key missing");
+
+    const db = getFirestore();
+    const snap = await db.collection("songs").get();
+    let updated = 0;
+    let skipped = 0;
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (data.bpm != null) { skipped++; continue; }
+      const title = data.name as string;
+      const artist = (data.artists as Array<{ name: string }>)?.[0]?.name ?? "";
+      const bpm = await lookupBpm(apiKey, artist, title);
+      if (bpm != null) {
+        await doc.ref.update({ bpm });
+        updated++;
+      }
+      // GetSongBPM is rate-limited; sleep briefly between calls.
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return { updated, skipped, total: snap.size };
   }
 );
 

@@ -326,10 +326,67 @@ button.ghost {
   font-size: 0.78rem;
 }
 
-@media (max-width: 540px) {
-  .song { grid-template-columns: 22px 48px 1fr auto; }
-  .song .cover { width: 48px; height: 48px; }
-  .preview { display: none; }
-  .topbar h1 { font-size: 1.1rem; }
+@media (max-width: 640px) {
+  .app { padding: 14px 12px 80px; }
+
+  .topbar { gap: 8px; }
+  .topbar h1 { font-size: 1.05rem; line-height: 1.2; }
+  .user { gap: 6px; }
   .user span { display: none; }
+  .user img { width: 28px; height: 28px; }
+  .ghost { padding: 6px 10px; font-size: 0.85rem; }
+
+  .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { min-height: 110px; padding: 10px; }
+  .stat-card.numbers { grid-column: 1 / -1; flex-direction: row; justify-content: space-around; }
+  .stat-card.numbers .num span { font-size: 1.25rem; }
+
+  .add-song { padding: 14px; }
+  .add-header h2 { font-size: 1rem; }
+  .search { padding: 14px 14px 14px 42px; font-size: 1rem; }
+
+  .results { max-height: 60vh; }
+  .result { padding: 8px; gap: 8px; }
+  .result button.primary { padding: 8px 10px; font-size: 0.85rem; }
+
+  .song {
+    grid-template-columns: 22px 56px 1fr auto;
+    grid-template-areas:
+      "rank cover meta meta"
+      "rank cover preview votes";
+    gap: 6px 10px;
+    padding: 10px;
+  }
+  .song .rank { grid-area: rank; align-self: center; }
+  .song .cover { grid-area: cover; width: 56px; height: 56px; align-self: start; }
+  .song .meta { grid-area: meta; }
+  .song .meta .sub { display: none; }
+  .song .preview { grid-area: preview; justify-self: end; }
+  .song .votes { grid-area: votes; justify-self: end; }
+
+  .votes { flex-direction: row; align-items: center; gap: 6px; min-width: 0; }
+  .vote { height: 36px; padding: 0 10px; }
+  .vote .vlabel { display: none; }
+  .vote .arrow { font-size: 0.85rem; }
+  .score { min-width: 28px; }
+
+  .added-by { flex-wrap: wrap; }
+  .delete-song { padding: 4px 10px; font-size: 0.72rem; }
+
+  .export { padding: 10px 12px; }
+  .export-btn { padding: 10px 14px; font-size: 0.95rem; }
+
+  .preview { width: 40px; height: 40px; font-size: 1rem; }
+  .preview.sm { width: 36px; height: 36px; font-size: 0.85rem; }
+
+  .toast { left: 12px; right: 12px; bottom: 16px; transform: none; max-width: none; }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (max-width: 380px) {
+  .stats { grid-template-columns: 1fr; }
+  .stat-card.numbers { flex-direction: row; }
 }

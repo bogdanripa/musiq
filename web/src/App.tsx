@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
-import { subscribeMyVotes, subscribeSongs, type VoteMap } from "./api";
+import {
+  subscribeAllVoteCounts,
+  subscribeMyVotes,
+  subscribeSongs,
+  type VoteCounts,
+  type VoteMap,
+} from "./api";
 import type { Song } from "./types";
 import { SignIn } from "./components/SignIn";
 import { Playlist } from "./components/Playlist";
@@ -20,6 +26,7 @@ export default function App() {
   const [authReady, setAuthReady] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [myVotes, setMyVotes] = useState<VoteMap>({});
+  const [voteCounts, setVoteCounts] = useState<VoteCounts>({});
   const [toast, setToast] = useState<ToastState>(null);
 
   useEffect(() => onAuthStateChanged(auth, (u) => { setUser(u); setAuthReady(true); }), []);
@@ -32,6 +39,11 @@ export default function App() {
   useEffect(() => {
     if (!user) { setMyVotes({}); return; }
     return subscribeMyVotes(user.uid, setMyVotes);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setVoteCounts({}); return; }
+    return subscribeAllVoteCounts(setVoteCounts);
   }, [user]);
 
   const myCount = useMemo(
@@ -53,7 +65,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>🎉 Bogdan's Birthday Playlist</h1>
+        <h1>🎉 Body's Birthday Playlist</h1>
         <div className="user">
           {user.photoURL && <img src={user.photoURL} alt="" />}
           <span>{user.displayName ?? user.email}</span>
@@ -61,9 +73,9 @@ export default function App() {
         </div>
       </header>
 
-      <Stats songs={songs} />
+      <Stats songs={songs} voteCounts={voteCounts} />
 
-      {user.email === HOST_EMAIL && <ExportToSpotify songs={songs} />}
+      {user.email === HOST_EMAIL && <ExportToSpotify songs={songs} showToast={showToast} />}
 
       <AddSong songs={songs} myCount={myCount} myVotes={myVotes} showToast={showToast} />
 
